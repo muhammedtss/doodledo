@@ -26,17 +26,20 @@ export const HomeScreen = () => {
   
   const confettiRef = useRef<ConfettiCannon>(null);
 
+  // Market Envanter
   const hasRedPen = inventory.includes('pen_red');
   const hasGoldPen = inventory.includes('pen_gold');
   const activePen = hasGoldPen ? 'gold' : (hasRedPen ? 'red' : 'default');
   const activePattern = inventory.includes('bg_lines') ? 'lines' : (inventory.includes('bg_dots') ? 'dots' : 'grid');
 
+  // UI State
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isModalVisible, setModalVisible] = useState(false);
   const [isTimerVisible, setTimerVisible] = useState(false);
   const [isSettingsVisible, setSettingsVisible] = useState(false);
   const [isMarketVisible, setMarketVisible] = useState(false);
   
+  // Form State
   const [searchQuery, setSearchQuery] = useState('');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -45,6 +48,7 @@ export const HomeScreen = () => {
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
 
+  // Date Picker State
   const [tempDate, setTempDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
@@ -66,18 +70,13 @@ export const HomeScreen = () => {
 
   if (isLoading) return null;
 
-  // --- KRİTİK DÜZELTME: PERFORMANS AYARI ---
-  const handleToggle = (id: string, completed: boolean) => {
-      // 1. ÖNCE İŞLEMİ YAP (Anlık tepki için)
-      toggleComplete(id);
+  // --- MANTIK ---
 
-      // 2. EFEKTLERİ SONRA YAP
+  const handleToggle = (id: string, completed: boolean) => {
+      toggleComplete(id);
       if (!completed) {
           Vibration.vibrate(50);
-          // Konfeti UI güncellemesini bloklamasın diye minik gecikme veriyoruz
-          setTimeout(() => {
-              confettiRef.current?.start();
-          }, 50);
+          setTimeout(() => { confettiRef.current?.start(); }, 50);
       } else {
           Vibration.vibrate(10);
       }
@@ -94,7 +93,8 @@ export const HomeScreen = () => {
       setNewTaskTitle('');
       setSelectedCategory('Personal');
       const now = new Date();
-      const def = new Date(selectedDate);
+      // Varsayılan olarak SEÇİLİ GÜN + ŞU ANKİ SAAT
+      const def = new Date(selectedDate); 
       def.setHours(now.getHours(), now.getMinutes());
       setTempDate(def);
     }
@@ -119,15 +119,32 @@ export const HomeScreen = () => {
     }
   };
 
+  // --- HATA DÜZELTİLDİ: SAĞLAM TARİH SEÇİM MANTIĞI ---
   const onDateChange = (event: DateTimePickerEvent, selected?: Date) => {
     if (Platform.OS === 'android') setShowPicker(false);
+    
+    // Eğer iptal edildiyse veya tarih yoksa hiçbir şey yapma
     if (event.type === 'dismissed' || !selected) return;
-    setTempDate(prev => {
-        const next = new Date(prev);
-        if (pickerMode === 'date') next.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
-        else next.setHours(selected.getHours(), selected.getMinutes());
-        return next;
+    
+    // State'i güncelle (Fonksiyonel update kullanarak son değeri garantiye alıyoruz)
+    setTempDate(prevDate => {
+        const newDate = new Date(prevDate.getTime()); // Önceki tarihin kopyasını al
+
+        if (pickerMode === 'date') {
+            // Sadece YIL, AY, GÜN güncelle. Saati koru.
+            newDate.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+        } else {
+            // Sadece SAAT ve DAKİKA güncelle. Tarihi koru.
+            newDate.setHours(selected.getHours());
+            newDate.setMinutes(selected.getMinutes());
+        }
+        return newDate;
     });
+  };
+
+  const showPickerMode = (mode: 'date' | 'time') => {
+      setPickerMode(mode);
+      setShowPicker(true);
   };
 
   const handleSave = async () => {
@@ -203,7 +220,7 @@ export const HomeScreen = () => {
                 index={index} 
                 onPress={() => openModal(item as any)} 
                 onLongPress={() => handleDelete(item.id)}
-                onToggle={() => handleToggle(item.id, item.completed)} // Optimize edilmiş fonksiyon
+                onToggle={() => handleToggle(item.id, item.completed)}
                 isDarkMode={settings.isDarkMode}
                 penColor={settings.activePen}
                 sticker={settings.activeSticker}
@@ -240,11 +257,23 @@ export const HomeScreen = () => {
                     {!isAddingCategory ? (<TouchableOpacity onPress={() => setIsAddingCategory(true)} style={{paddingVertical: 6, paddingHorizontal: 12, borderWidth: 2, borderRadius: 15, borderColor: DOODLE_COLORS.bluePen, borderStyle: 'dashed'}}><Text style={[styles.textHand, {color: DOODLE_COLORS.bluePen, fontSize: 14}]}>+ Ekle</Text></TouchableOpacity>) : (<View style={{flexDirection:'row', alignItems:'center', gap: 5}}><TextInput style={{borderBottomWidth: 1, borderColor:'#ccc', width: 80, color: settings.isDarkMode ? '#fff' : '#000'}} placeholder="Yeni..." value={newCategoryName} onChangeText={setNewCategoryName} autoFocus /><TouchableOpacity onPress={handleAddCategory}><Text>✅</Text></TouchableOpacity><TouchableOpacity onPress={()=>setIsAddingCategory(false)}><Text>❌</Text></TouchableOpacity></View>)}
                 </View>
 
+                {/* TARİH SEÇİCİ TETİKLEYİCİLERİ */}
                 <View style={{flexDirection:'row', gap:10, marginVertical:10}}>
-                    <TouchableOpacity onPress={()=>{setShowPicker(true); setPickerMode('date')}} style={[styles.doodleBox, {flex:1}]}><Text style={styles.textHand}>📅 {format(tempDate, 'dd MMM')}</Text></TouchableOpacity>
-                    <TouchableOpacity onPress={()=>{setShowPicker(true); setPickerMode('time')}} style={[styles.doodleBox, {flex:1}]}><Text style={styles.textHand}>⏰ {format(tempDate, 'HH:mm')}</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={()=>showPickerMode('date')} style={[styles.doodleBox, {flex:1}]}><Text style={styles.textHand}>📅 {format(tempDate, 'dd MMM')}</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={()=>showPickerMode('time')} style={[styles.doodleBox, {flex:1}]}><Text style={styles.textHand}>⏰ {format(tempDate, 'HH:mm')}</Text></TouchableOpacity>
                 </View>
-                {showPicker && (<DateTimePicker value={tempDate} mode={pickerMode} is24Hour={true} display="default" onChange={(e, d) => {if(Platform.OS==='android') setShowPicker(false); if(d) setTempDate(d);}} />)}
+                
+                {/* DATE PICKER */}
+                {showPicker && (
+                    <DateTimePicker 
+                        value={tempDate} 
+                        mode={pickerMode} 
+                        is24Hour={true} 
+                        display="default" 
+                        onChange={onDateChange} 
+                    />
+                )}
+
                 <View style={{marginTop:'auto'}}>
                     <TouchableOpacity onPress={handleSave} style={[styles.doodleBox, {marginTop:20, backgroundColor: DOODLE_COLORS.bluePen}]}><Text style={[styles.textHand, {color:'#fff', textAlign:'center'}]}>{editingTaskId ? 'Güncelle' : 'Kaydet'}</Text></TouchableOpacity>
                     {editingTaskId && (<TouchableOpacity onPress={() => handleDelete(editingTaskId)} style={{alignItems:'center', marginTop:15}}><Text style={[styles.textHand, {color: DOODLE_COLORS.redPen}]}>Sil</Text></TouchableOpacity>)}
