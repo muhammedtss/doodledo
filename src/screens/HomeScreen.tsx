@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Modal, TextInput, FlatList, SafeAreaView, TouchableOpacity, Platform, KeyboardAvoidingView, Alert, Vibration } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { format, addDays, isSameDay } from 'date-fns';
-// ÖNEMLİ DEĞİŞİKLİK: DateTimePickerAndroid import edildi
-import DateTimePicker, { DateTimePickerEvent, DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import ConfettiCannon from 'react-native-confetti-cannon';
 
 import { useStore } from '../store/useStore';
@@ -27,9 +26,7 @@ export const HomeScreen = () => {
   
   const confettiRef = useRef<ConfettiCannon>(null);
 
-  const hasRedPen = inventory.includes('pen_red');
-  const hasGoldPen = inventory.includes('pen_gold');
-  const activePen = hasGoldPen ? 'gold' : (hasRedPen ? 'red' : 'default');
+  const activePen = inventory.includes('pen_gold') ? 'gold' : (inventory.includes('pen_red') ? 'red' : 'default');
   const activePattern = inventory.includes('bg_lines') ? 'lines' : (inventory.includes('bg_dots') ? 'dots' : 'grid');
 
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -46,9 +43,8 @@ export const HomeScreen = () => {
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
 
-  // Date Picker State
   const [tempDate, setTempDate] = useState(new Date());
-  const [showPicker, setShowPicker] = useState(false); // Sadece iOS için kullanılır
+  const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
 
   let visibleTasks = useTaskFilters(tasks, selectedDate);
@@ -72,7 +68,7 @@ export const HomeScreen = () => {
       toggleComplete(id);
       if (!completed) {
           Vibration.vibrate(50);
-          setTimeout(() => { confettiRef.current?.start(); }, 100);
+          setTimeout(() => { confettiRef.current?.start(); }, 50);
       } else {
           Vibration.vibrate(10);
       }
@@ -114,47 +110,24 @@ export const HomeScreen = () => {
     }
   };
 
-  // --- TARİH GÜNCELLEME MANTIĞI ---
-  const updateDateState = (selectedDate: Date, mode: 'date' | 'time') => {
-      setTempDate((prevDate) => {
-          const newDate = new Date(prevDate.getTime());
-          if (mode === 'date') {
-              newDate.setFullYear(selectedDate.getFullYear());
-              newDate.setMonth(selectedDate.getMonth());
-              newDate.setDate(selectedDate.getDate());
-          } else {
-              newDate.setHours(selectedDate.getHours());
-              newDate.setMinutes(selectedDate.getMinutes());
-          }
-          return newDate;
-      });
-  };
-
   const onDateChange = (event: DateTimePickerEvent, selected?: Date) => {
     if (Platform.OS === 'android') setShowPicker(false);
     if (event.type === 'dismissed' || !selected) return;
-    updateDateState(selected, pickerMode);
+
+    setTempDate((prevDate) => {
+        const newDate = new Date(prevDate.getTime());
+        if (pickerMode === 'date') {
+            newDate.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+        } else {
+            newDate.setHours(selected.getHours(), selected.getMinutes());
+        }
+        return newDate;
+    });
   };
 
-  // --- ÇÖZÜM BURADA: ANDROID İÇİN AYRI API KULLANIMI ---
   const showPickerMode = (mode: 'date' | 'time') => {
-      if (Platform.OS === 'android') {
-          // Android için IMPERATIVE API kullanıyoruz. Bu React render döngüsünden etkilenmez.
-          DateTimePickerAndroid.open({
-              value: tempDate,
-              onChange: (event, date) => {
-                  if (event.type === 'set' && date) {
-                      updateDateState(date, mode);
-                  }
-              },
-              mode: mode,
-              is24Hour: true,
-          });
-      } else {
-          // iOS için standart yöntem
-          setPickerMode(mode);
-          setShowPicker(true);
-      }
+      setPickerMode(mode);
+      setShowPicker(true);
   };
 
   const handleSave = async () => {
@@ -194,20 +167,18 @@ export const HomeScreen = () => {
       <PaperBackground isDarkMode={settings.isDarkMode} pattern={settings.activeBg as any} />
       <StatusBar style={settings.isDarkMode ? "light" : "dark"} />
       
-      <ConfettiCannon count={200} origin={{x: -10, y: 0}} autoStart={false} ref={confettiRef} fadeOut={true} />
+      {/* PERFORMANCE: Konfeti sayısı düşürüldü */}
+      <ConfettiCannon count={50} origin={{x: -10, y: 0}} autoStart={false} ref={confettiRef} fadeOut={true} />
 
       <View style={{ flex: 1, padding: 20 }}>
         {renderHeader()}
-        
         <View style={{marginBottom: 5}}>
             <TextInput style={[styles.doodleBox, styles.textHand, {height: 45, paddingVertical: 5, fontSize: 16, borderRadius: 20}]} placeholder="🔍 Ara..." placeholderTextColor={settings.isDarkMode ? '#bdc3c7' : '#95a5a6'} value={searchQuery} onChangeText={setSearchQuery} />
         </View>
-
         <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center', paddingHorizontal: 5}}>
             <Text style={[styles.textHand, {fontSize: 20}]}>{format(selectedDate, 'MMMM yyyy')}</Text>
             <Text style={[styles.textHand, {fontSize:14, color: DOODLE_COLORS.bluePen}]}>{completedCount}/{totalCount} Tamam</Text>
         </View>
-
         <View style={{flexDirection:'row', marginBottom:10}}>
             {[0,1,2,3,4].map(i => {
                 const d = addDays(new Date(), i);
@@ -223,25 +194,20 @@ export const HomeScreen = () => {
         <FlatList
           data={visibleTasks}
           keyExtractor={item => item.id}
+          // PERFORMANCE: Liste optimizasyonları
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={true}
           contentContainerStyle={{ paddingBottom: 120 }}
           renderItem={({ item, index }) => (
             <TaskItem 
-                task={item as any} 
-                index={index} 
-                onPress={() => openModal(item as any)} 
-                onLongPress={() => handleDelete(item.id)}
+                task={item as any} index={index} onPress={() => openModal(item as any)} onLongPress={() => handleDelete(item.id)} 
                 onToggle={() => handleToggle(item.id, item.completed)}
-                isDarkMode={settings.isDarkMode}
-                penColor={settings.activePen}
-                sticker={settings.activeSticker}
+                isDarkMode={settings.isDarkMode} penColor={settings.activePen} sticker={settings.activeSticker}
             />
           )}
-          ListEmptyComponent={
-            <View style={{ alignItems: 'center', marginTop: 40, opacity: 0.5 }}>
-              <Text style={{ fontSize: 60 }}>🍃</Text>
-              <Text style={styles.textHand}>{searchQuery ? "Sonuç yok." : "Kağıt boş..."}</Text>
-            </View>
-          }
+          ListEmptyComponent={<View style={{ alignItems: 'center', marginTop: 40, opacity: 0.5 }}><Text style={{ fontSize: 60 }}>🍃</Text><Text style={styles.textHand}>{searchQuery ? "Sonuç yok." : "Kağıt boş..."}</Text></View>}
           ListFooterComponent={<AIAssistant onAccept={handleAIAccept} />}
         />
 
@@ -256,7 +222,6 @@ export const HomeScreen = () => {
                     <TouchableOpacity onPress={()=>setModalVisible(false)}><Text style={{fontSize:24}}>❌</Text></TouchableOpacity>
                 </View>
                 <TextInput style={[styles.doodleBox, styles.textHand]} placeholder="Ne yapacaksın?" placeholderTextColor={settings.isDarkMode ? '#bdc3c7' : '#95a5a6'} value={newTaskTitle} onChangeText={setNewTaskTitle} />
-                
                 <Text style={[styles.textHand, {marginTop: 10}]}>Kategori:</Text>
                 <View style={{flexDirection:'row', flexWrap: 'wrap', gap: 8, marginTop: 5, marginBottom: 15}}>
                     {categories.map((cat) => (
@@ -266,33 +231,11 @@ export const HomeScreen = () => {
                     ))}
                     {!isAddingCategory ? (<TouchableOpacity onPress={() => setIsAddingCategory(true)} style={{paddingVertical: 6, paddingHorizontal: 12, borderWidth: 2, borderRadius: 15, borderColor: DOODLE_COLORS.bluePen, borderStyle: 'dashed'}}><Text style={[styles.textHand, {color: DOODLE_COLORS.bluePen, fontSize: 14}]}>+ Ekle</Text></TouchableOpacity>) : (<View style={{flexDirection:'row', alignItems:'center', gap: 5}}><TextInput style={{borderBottomWidth: 1, borderColor:'#ccc', width: 80, color: settings.isDarkMode ? '#fff' : '#000'}} placeholder="Yeni..." value={newCategoryName} onChangeText={setNewCategoryName} autoFocus /><TouchableOpacity onPress={handleAddCategory}><Text>✅</Text></TouchableOpacity><TouchableOpacity onPress={()=>setIsAddingCategory(false)}><Text>❌</Text></TouchableOpacity></View>)}
                 </View>
-
-                {/* TARİH SEÇİCİ TETİKLEYİCİLERİ */}
                 <View style={{flexDirection:'row', gap:10, marginVertical:10}}>
-                    {/* Tarih Butonu */}
-                    <TouchableOpacity onPress={()=>showPickerMode('date')} style={[styles.doodleBox, {flex:1, alignItems:'center', backgroundColor: '#e8f8f5'}]}>
-                        <Text style={{fontSize:24}}>📅</Text>
-                        <Text style={styles.textHand}>{format(tempDate, 'dd MMM')}</Text>
-                    </TouchableOpacity>
-                    
-                    {/* Saat Butonu */}
-                    <TouchableOpacity onPress={()=>showPickerMode('time')} style={[styles.doodleBox, {flex:1, alignItems:'center', backgroundColor: '#fef9e7'}]}>
-                        <Text style={{fontSize:24}}>⏰</Text>
-                        <Text style={styles.textHand}>{format(tempDate, 'HH:mm')}</Text>
-                    </TouchableOpacity>
+                    <TouchableOpacity onPress={()=>showPickerMode('date')} style={[styles.doodleBox, {flex:1}]}><Text style={styles.textHand}>📅 {format(tempDate, 'dd MMM')}</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={()=>showPickerMode('time')} style={[styles.doodleBox, {flex:1}]}><Text style={styles.textHand}>⏰ {format(tempDate, 'HH:mm')}</Text></TouchableOpacity>
                 </View>
-                
-                {/* DATE PICKER (SADECE IOS İÇİN GÖRÜNÜR) */}
-                {Platform.OS === 'ios' && showPicker && (
-                    <DateTimePicker 
-                        value={tempDate} 
-                        mode={pickerMode} 
-                        is24Hour={true} 
-                        display="spinner" 
-                        onChange={onDateChange} 
-                    />
-                )}
-
+                {showPicker && (<DateTimePicker value={tempDate} mode={pickerMode} is24Hour={true} display="default" onChange={onDateChange} />)}
                 <View style={{marginTop:'auto'}}>
                     <TouchableOpacity onPress={handleSave} style={[styles.doodleBox, {marginTop:20, backgroundColor: DOODLE_COLORS.bluePen}]}><Text style={[styles.textHand, {color:'#fff', textAlign:'center'}]}>{editingTaskId ? 'Güncelle' : 'Kaydet'}</Text></TouchableOpacity>
                     {editingTaskId && (<TouchableOpacity onPress={() => handleDelete(editingTaskId)} style={{alignItems:'center', marginTop:15}}><Text style={[styles.textHand, {color: DOODLE_COLORS.redPen}]}>Sil</Text></TouchableOpacity>)}
@@ -300,7 +243,6 @@ export const HomeScreen = () => {
             </View>
          </KeyboardAvoidingView>
       </Modal>
-
       <MarketModal visible={isMarketVisible} onClose={() => setMarketVisible(false)} />
       <SettingsModal visible={isSettingsVisible} onClose={() => setSettingsVisible(false)} />
       <TimerModal visible={isTimerVisible} onClose={() => setTimerVisible(false)} />
