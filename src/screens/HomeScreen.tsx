@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Modal, TextInput, FlatList, SafeAreaView, TouchableOpacity, Platform, KeyboardAvoidingView, Alert, Vibration } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { format, addDays, isSameDay } from 'date-fns';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+// ÖNEMLİ DEĞİŞİKLİK: DateTimePickerAndroid import edildi
+import DateTimePicker, { DateTimePickerEvent, DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import ConfettiCannon from 'react-native-confetti-cannon';
 
 import { useStore } from '../store/useStore';
@@ -26,20 +27,17 @@ export const HomeScreen = () => {
   
   const confettiRef = useRef<ConfettiCannon>(null);
 
-  // Market Envanter
   const hasRedPen = inventory.includes('pen_red');
   const hasGoldPen = inventory.includes('pen_gold');
   const activePen = hasGoldPen ? 'gold' : (hasRedPen ? 'red' : 'default');
   const activePattern = inventory.includes('bg_lines') ? 'lines' : (inventory.includes('bg_dots') ? 'dots' : 'grid');
 
-  // UI State
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isModalVisible, setModalVisible] = useState(false);
   const [isTimerVisible, setTimerVisible] = useState(false);
   const [isSettingsVisible, setSettingsVisible] = useState(false);
   const [isMarketVisible, setMarketVisible] = useState(false);
   
-  // Form State
   const [searchQuery, setSearchQuery] = useState('');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -50,7 +48,7 @@ export const HomeScreen = () => {
 
   // Date Picker State
   const [tempDate, setTempDate] = useState(new Date());
-  const [showPicker, setShowPicker] = useState(false);
+  const [showPicker, setShowPicker] = useState(false); // Sadece iOS için kullanılır
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
 
   let visibleTasks = useTaskFilters(tasks, selectedDate);
@@ -70,13 +68,11 @@ export const HomeScreen = () => {
 
   if (isLoading) return null;
 
-  // --- MANTIK ---
-
   const handleToggle = (id: string, completed: boolean) => {
       toggleComplete(id);
       if (!completed) {
           Vibration.vibrate(50);
-          setTimeout(() => { confettiRef.current?.start(); }, 50);
+          setTimeout(() => { confettiRef.current?.start(); }, 100);
       } else {
           Vibration.vibrate(10);
       }
@@ -93,8 +89,7 @@ export const HomeScreen = () => {
       setNewTaskTitle('');
       setSelectedCategory('Personal');
       const now = new Date();
-      // Varsayılan olarak SEÇİLİ GÜN + ŞU ANKİ SAAT
-      const def = new Date(selectedDate); 
+      const def = new Date(selectedDate);
       def.setHours(now.getHours(), now.getMinutes());
       setTempDate(def);
     }
@@ -119,32 +114,47 @@ export const HomeScreen = () => {
     }
   };
 
-  // --- HATA DÜZELTİLDİ: SAĞLAM TARİH SEÇİM MANTIĞI ---
-  const onDateChange = (event: DateTimePickerEvent, selected?: Date) => {
-    if (Platform.OS === 'android') setShowPicker(false);
-    
-    // Eğer iptal edildiyse veya tarih yoksa hiçbir şey yapma
-    if (event.type === 'dismissed' || !selected) return;
-    
-    // State'i güncelle (Fonksiyonel update kullanarak son değeri garantiye alıyoruz)
-    setTempDate(prevDate => {
-        const newDate = new Date(prevDate.getTime()); // Önceki tarihin kopyasını al
-
-        if (pickerMode === 'date') {
-            // Sadece YIL, AY, GÜN güncelle. Saati koru.
-            newDate.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
-        } else {
-            // Sadece SAAT ve DAKİKA güncelle. Tarihi koru.
-            newDate.setHours(selected.getHours());
-            newDate.setMinutes(selected.getMinutes());
-        }
-        return newDate;
-    });
+  // --- TARİH GÜNCELLEME MANTIĞI ---
+  const updateDateState = (selectedDate: Date, mode: 'date' | 'time') => {
+      setTempDate((prevDate) => {
+          const newDate = new Date(prevDate.getTime());
+          if (mode === 'date') {
+              newDate.setFullYear(selectedDate.getFullYear());
+              newDate.setMonth(selectedDate.getMonth());
+              newDate.setDate(selectedDate.getDate());
+          } else {
+              newDate.setHours(selectedDate.getHours());
+              newDate.setMinutes(selectedDate.getMinutes());
+          }
+          return newDate;
+      });
   };
 
+  const onDateChange = (event: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === 'android') setShowPicker(false);
+    if (event.type === 'dismissed' || !selected) return;
+    updateDateState(selected, pickerMode);
+  };
+
+  // --- ÇÖZÜM BURADA: ANDROID İÇİN AYRI API KULLANIMI ---
   const showPickerMode = (mode: 'date' | 'time') => {
-      setPickerMode(mode);
-      setShowPicker(true);
+      if (Platform.OS === 'android') {
+          // Android için IMPERATIVE API kullanıyoruz. Bu React render döngüsünden etkilenmez.
+          DateTimePickerAndroid.open({
+              value: tempDate,
+              onChange: (event, date) => {
+                  if (event.type === 'set' && date) {
+                      updateDateState(date, mode);
+                  }
+              },
+              mode: mode,
+              is24Hour: true,
+          });
+      } else {
+          // iOS için standart yöntem
+          setPickerMode(mode);
+          setShowPicker(true);
+      }
   };
 
   const handleSave = async () => {
@@ -259,17 +269,26 @@ export const HomeScreen = () => {
 
                 {/* TARİH SEÇİCİ TETİKLEYİCİLERİ */}
                 <View style={{flexDirection:'row', gap:10, marginVertical:10}}>
-                    <TouchableOpacity onPress={()=>showPickerMode('date')} style={[styles.doodleBox, {flex:1}]}><Text style={styles.textHand}>📅 {format(tempDate, 'dd MMM')}</Text></TouchableOpacity>
-                    <TouchableOpacity onPress={()=>showPickerMode('time')} style={[styles.doodleBox, {flex:1}]}><Text style={styles.textHand}>⏰ {format(tempDate, 'HH:mm')}</Text></TouchableOpacity>
+                    {/* Tarih Butonu */}
+                    <TouchableOpacity onPress={()=>showPickerMode('date')} style={[styles.doodleBox, {flex:1, alignItems:'center', backgroundColor: '#e8f8f5'}]}>
+                        <Text style={{fontSize:24}}>📅</Text>
+                        <Text style={styles.textHand}>{format(tempDate, 'dd MMM')}</Text>
+                    </TouchableOpacity>
+                    
+                    {/* Saat Butonu */}
+                    <TouchableOpacity onPress={()=>showPickerMode('time')} style={[styles.doodleBox, {flex:1, alignItems:'center', backgroundColor: '#fef9e7'}]}>
+                        <Text style={{fontSize:24}}>⏰</Text>
+                        <Text style={styles.textHand}>{format(tempDate, 'HH:mm')}</Text>
+                    </TouchableOpacity>
                 </View>
                 
-                {/* DATE PICKER */}
-                {showPicker && (
+                {/* DATE PICKER (SADECE IOS İÇİN GÖRÜNÜR) */}
+                {Platform.OS === 'ios' && showPicker && (
                     <DateTimePicker 
                         value={tempDate} 
                         mode={pickerMode} 
                         is24Hour={true} 
-                        display="default" 
+                        display="spinner" 
                         onChange={onDateChange} 
                     />
                 )}
