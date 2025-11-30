@@ -22,21 +22,39 @@ export const MarketModal: React.FC<MarketModalProps> = ({ visible, onClose }) =>
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.container}>
         <View style={styles.content}>
-          <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:20}}>
-            <Text style={globalStyles.headerTitle}>Kırtasiye 🏪</Text>
-            <View style={{backgroundColor: DOODLE_COLORS.paper, padding:8, borderRadius:10, borderWidth:1, borderColor: DOODLE_COLORS.ink}}>
-                <Text style={globalStyles.textHand}>💧 {stats.ink} Mürekkep</Text>
+          
+          {/* --- HEADER --- */}
+          <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'flex-start', marginBottom: 15}}>
+            <View>
+                <Text style={[globalStyles.headerTitle, {fontSize: 32}]}>Kırtasiye 🏪</Text>
+                <Text style={[globalStyles.textHand, {fontSize: 16, color: DOODLE_COLORS.bluePen}]}>
+                    Cüzdan: {stats.ink} 💧
+                </Text>
             </View>
+
+            {/* YENİ KAPATMA BUTONU (Sağ Üst) */}
+            <TouchableOpacity 
+                onPress={onClose} 
+                style={{
+                    padding: 5,
+                    transform: [{ rotate: '6deg' }] // Asimetrik duruş
+                }}
+            >
+                <Text style={{fontSize: 28, color: DOODLE_COLORS.redPen}}>❌</Text>
+            </TouchableOpacity>
           </View>
 
+          {/* --- LİSTE --- */}
           <FlatList
             data={shopItems}
             keyExtractor={item => item.id}
+            contentContainerStyle={{paddingBottom: 20}}
+            showsVerticalScrollIndicator={false}
             renderItem={({ item }) => {
               const active = isEquipped(item);
               return (
               <View style={[globalStyles.doodleBox, { flexDirection: 'row', alignItems: 'center', backgroundColor: active ? '#e8f8f5' : '#fff' }]}>
-                <Text style={{fontSize: 40, marginRight: 15}}>{item.icon}</Text>
+                <Text style={{fontSize: 36, marginRight: 15}}>{item.icon}</Text>
                 <View style={{flex: 1}}>
                     <Text style={[globalStyles.textHand, {fontSize: 20}]}>{item.name}</Text>
                     <Text style={[globalStyles.textHand, {fontSize: 14, color: DOODLE_COLORS.pencil}]}>{item.description}</Text>
@@ -44,16 +62,16 @@ export const MarketModal: React.FC<MarketModalProps> = ({ visible, onClose }) =>
                 <View style={{alignItems:'center'}}>
                     {item.owned ? (
                         active ? (
-                            <TouchableOpacity onPress={() => unequipItem(item.type)} style={{padding:5, borderWidth:1, borderRadius:5, borderColor: DOODLE_COLORS.ink}}>
-                                <Text style={{fontSize:12}}>Çıkar ❌</Text>
+                            <TouchableOpacity onPress={() => unequipItem(item.type)} style={{padding:6, borderWidth:2, borderRadius:8, borderColor: DOODLE_COLORS.ink, borderStyle:'dashed'}}>
+                                <Text style={{fontSize:12, fontWeight:'bold'}}>Çıkar</Text>
                             </TouchableOpacity>
                         ) : (
-                            <TouchableOpacity onPress={() => equipItem(item)} style={{padding:5, borderWidth:1, borderRadius:5, backgroundColor: DOODLE_COLORS.ink}}>
-                                <Text style={{fontSize:12, color:'#fff'}}>Kullan ✅</Text>
+                            <TouchableOpacity onPress={() => equipItem(item)} style={{padding:6, borderWidth:2, borderRadius:8, backgroundColor: DOODLE_COLORS.ink, borderColor: DOODLE_COLORS.ink}}>
+                                <Text style={{fontSize:12, color:'#fff', fontWeight:'bold'}}>Kullan</Text>
                             </TouchableOpacity>
                         )
                     ) : (
-                        <TouchableOpacity onPress={() => buyItem(item.id)} style={{backgroundColor: DOODLE_COLORS.bluePen, padding:5, borderRadius:5}}>
+                        <TouchableOpacity onPress={() => buyItem(item.id)} style={{backgroundColor: DOODLE_COLORS.bluePen, padding:8, borderRadius:8, borderWidth:2, borderColor: DOODLE_COLORS.ink}}>
                             <Text style={[globalStyles.textHand, {color:'#fff', fontSize:14}]}>{item.price}💧</Text>
                         </TouchableOpacity>
                     )}
@@ -61,10 +79,9 @@ export const MarketModal: React.FC<MarketModalProps> = ({ visible, onClose }) =>
               </View>
             )}}
           />
+          
+          {/* Alt kısımdaki buton kaldırıldı, liste artık daha geniş alana sahip */}
 
-          <TouchableOpacity onPress={onClose} style={{ marginTop: 20, alignSelf: 'center' }}>
-            <Text style={[globalStyles.textHand, { color: DOODLE_COLORS.redPen }]}>Dükkandan Çık</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -72,6 +89,18 @@ export const MarketModal: React.FC<MarketModalProps> = ({ visible, onClose }) =>
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  content: { flex: 0.85, borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20, backgroundColor: '#fff', borderTopWidth: 3, borderColor: DOODLE_COLORS.ink }
+  container: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  content: {
+    flex: 0.85, // Ekranın %85'ini kaplasın
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 25,
+    backgroundColor: '#fff', 
+    borderTopWidth: 3,
+    borderColor: DOODLE_COLORS.ink
+  }
 });
