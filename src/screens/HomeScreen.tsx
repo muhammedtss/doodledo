@@ -3,7 +3,7 @@ import { View, Text, Modal, TextInput, FlatList, SafeAreaView, TouchableOpacity,
 import { StatusBar } from 'expo-status-bar';
 import { format, addDays, isSameDay } from 'date-fns';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import ConfettiCannon from 'react-native-confetti-cannon'; // YENİ EKLENTİ
+import ConfettiCannon from 'react-native-confetti-cannon';
 
 import { useStore } from '../store/useStore';
 import { getGlobalStyles, DOODLE_COLORS } from '../theme/styles';
@@ -24,16 +24,13 @@ export const HomeScreen = () => {
   const { tasks, stats, settings, inventory, initialize, addTask, updateTask, deleteTask, toggleComplete, isLoading } = useStore();
   const styles = getGlobalStyles(settings.isDarkMode);
   
-  // Konfeti Referansı
   const confettiRef = useRef<ConfettiCannon>(null);
 
-  // Market Envanter
   const hasRedPen = inventory.includes('pen_red');
   const hasGoldPen = inventory.includes('pen_gold');
   const activePen = hasGoldPen ? 'gold' : (hasRedPen ? 'red' : 'default');
   const activePattern = inventory.includes('bg_lines') ? 'lines' : (inventory.includes('bg_dots') ? 'dots' : 'grid');
 
-  // UI State
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isModalVisible, setModalVisible] = useState(false);
   const [isTimerVisible, setTimerVisible] = useState(false);
@@ -69,17 +66,21 @@ export const HomeScreen = () => {
 
   if (isLoading) return null;
 
-  // --- MANTIK ---
-
+  // --- KRİTİK DÜZELTME: PERFORMANS AYARI ---
   const handleToggle = (id: string, completed: boolean) => {
-      // Eğer görev tamamlanıyorsa (false -> true), konfeti patlat!
+      // 1. ÖNCE İŞLEMİ YAP (Anlık tepki için)
+      toggleComplete(id);
+
+      // 2. EFEKTLERİ SONRA YAP
       if (!completed) {
           Vibration.vibrate(50);
-          confettiRef.current?.start();
+          // Konfeti UI güncellemesini bloklamasın diye minik gecikme veriyoruz
+          setTimeout(() => {
+              confettiRef.current?.start();
+          }, 50);
       } else {
           Vibration.vibrate(10);
       }
-      toggleComplete(id);
   };
 
   const openModal = (task?: Task) => {
@@ -166,14 +167,7 @@ export const HomeScreen = () => {
       <PaperBackground isDarkMode={settings.isDarkMode} pattern={settings.activeBg as any} />
       <StatusBar style={settings.isDarkMode ? "light" : "dark"} />
       
-      {/* KONFETİ TOPU (Görünmez, sadece patlayınca efekt verir) */}
-      <ConfettiCannon 
-        count={200} 
-        origin={{x: -10, y: 0}} 
-        autoStart={false} 
-        ref={confettiRef} 
-        fadeOut={true}
-      />
+      <ConfettiCannon count={200} origin={{x: -10, y: 0}} autoStart={false} ref={confettiRef} fadeOut={true} />
 
       <View style={{ flex: 1, padding: 20 }}>
         {renderHeader()}
@@ -209,7 +203,7 @@ export const HomeScreen = () => {
                 index={index} 
                 onPress={() => openModal(item as any)} 
                 onLongPress={() => handleDelete(item.id)}
-                onToggle={() => handleToggle(item.id, item.completed)} // Konfeti tetikleyici
+                onToggle={() => handleToggle(item.id, item.completed)} // Optimize edilmiş fonksiyon
                 isDarkMode={settings.isDarkMode}
                 penColor={settings.activePen}
                 sticker={settings.activeSticker}
@@ -227,7 +221,6 @@ export const HomeScreen = () => {
         <TouchableOpacity onPress={() => openModal()} style={styles.fab}><Text style={{fontSize:32, color:'#fff'}}>+</Text></TouchableOpacity>
       </View>
 
-      {/* MODALLAR (Kısaltıldı - Öncekilerle Aynı) */}
       <Modal visible={isModalVisible} animationType="slide" transparent>
          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{flex:1, justifyContent:'flex-end', backgroundColor:'rgba(0,0,0,0.5)'}}>
             <View style={[styles.container, {flex:0.85, padding:20, backgroundColor: settings.isDarkMode ? '#2c3e50' : '#fff', borderTopLeftRadius:20, borderTopRightRadius:20}]}>
